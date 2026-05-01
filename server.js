@@ -41,6 +41,7 @@ app.all("/voice", (req, res) => {
 });
 
 app.post("/recording-finished", async (req, res) => {
+  res.set("Content-Type", "text/xml; charset=utf-8");
   res.send(`<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Say language="ja-JP">録音を受け付けました。ありがとうございました。</Say>
@@ -66,6 +67,7 @@ app.post("/recording-finished", async (req, res) => {
         username: TWILIO_ACCOUNT_SID,
         password: TWILIO_AUTH_TOKEN,
       },
+      timeout: 30000,
     });
 
     const form = new FormData();
@@ -85,19 +87,21 @@ app.post("/recording-finished", async (req, res) => {
           ...form.getHeaders(),
         },
         maxBodyLength: Infinity,
+        timeout: 60000,
       }
     );
 
     const transcript = transcriptionResp.data.text || "文字起こし結果なし";
 
     const transporter = nodemailer.createTransport({
-      host: "smtp.gmail.com",
-      port: 587,
-      secure: false,
+      service: "gmail",
       auth: {
         user: SMTP_USER,
         pass: SMTP_PASS,
       },
+      connectionTimeout: 30000,
+      greetingTimeout: 30000,
+      socketTimeout: 30000,
     });
 
     await transporter.sendMail({
