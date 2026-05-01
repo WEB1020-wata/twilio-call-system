@@ -1,7 +1,6 @@
 const express = require("express");
 const axios = require("axios");
 const FormData = require("form-data");
-const nodemailer = require("nodemailer");
 
 const app = express();
 
@@ -12,8 +11,8 @@ const {
   TWILIO_ACCOUNT_SID,
   TWILIO_AUTH_TOKEN,
   OPENAI_API_KEY,
+  SENDGRID_API_KEY,
   SMTP_USER,
-  SMTP_PASS,
   MAIL_TO,
 } = process.env;
 
@@ -63,7 +62,6 @@ app.post("/recording-finished", async (req, res) => {
 
     const wavUrl = `${recordingUrl}.wav`;
 
-    // Twilio側で録音ファイルの準備に少し時間がかかるため待つ
     await sleep(5000);
 
     const audioResp = await axios.get(wavUrl, {
@@ -98,42 +96,47 @@ app.post("/recording-finished", async (req, res) => {
 
     const transcript = transcriptionResp.data.text || "文字起こし結果なし";
 
-    const transporter = nodemailer.createTransport({
-      host: "smtp.gmail.com",
-      port: 465,
-      secure: true,
-      auth: {
-        user: SMTP_USER,
-        pass: SMTP_PASS,
+    await axios.post(
+      "https://api.sendgrid.com/v3/mail/send",
+      {
+        personalizations: [
+          {
+            to: [{ email: MAIL_TO }],
+            subject: "【電話録音・文字起こし】新しい着信がありました",
+          },
+        ],
+        from: {
+          email: SMTP_USER,
+          name: "Twilio Call System",
+        },
+        content: [
+          {
+            type: "text/plain",
+            value: [
+              "電話の録音内容を文字起こししました。",
+              "",
+              `発信元: ${from}`,
+              `着信先: ${to}`,
+              `録音時間: ${duration}秒`,
+              "",
+              "【文字起こし内容】",
+              transcript,
+            ].join("\n"),
+          },
+        ],
       },
-      connectionTimeout: 60000,
-      greetingTimeout: 60000,
-      socketTimeout: 60000,
-    });
-
-    await transporter.sendMail({
-      from: `"Twilio Call System" <${SMTP_USER}>`,
-      to: MAIL_TO,
-      subject: "【電話録音・文字起こし】新しい着信がありました",
-      text: [
-        "電話の録音内容を文字起こししました。",
-        "",
-        `発信元: ${from}`,
-        `着信先: ${to}`,
-        `録音時間: ${duration}秒`,
-        "",
-        "【文字起こし内容】",
-        transcript,
-      ].join("\n"),
-    });
+      {
+        headers: {
+          Authorization: `Bearer ${SENDGRID_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        timeout: 30000,
+      }
+    );
 
     console.log("メール送信完了");
   } catch (error) {
-    if (Buffer.isBuffer(error.response?.data)) {
-      console.error("処理エラー:", error.response.data.toString("utf8"));
-    } else {
-      console.error("処理エラー:", error.response?.data || error.message);
-    }
+    console.error("処理エラー:", error.response?.data || error.message);
   }
 });
 
