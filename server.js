@@ -63,7 +63,7 @@ app.post("/recording-finished", async (req, res) => {
 
     const wavUrl = `${recordingUrl}.wav`;
 
-    // Twilio側で録音ファイル準備に少し時間がかかるため待つ
+    // Twilio側で録音ファイルの準備に少し時間がかかるため待つ
     await sleep(5000);
 
     const audioResp = await axios.get(wavUrl, {
@@ -99,14 +99,16 @@ app.post("/recording-finished", async (req, res) => {
     const transcript = transcriptionResp.data.text || "文字起こし結果なし";
 
     const transporter = nodemailer.createTransport({
-      service: "gmail",
+      host: "smtp.gmail.com",
+      port: 465,
+      secure: true,
       auth: {
         user: SMTP_USER,
         pass: SMTP_PASS,
       },
-      connectionTimeout: 30000,
-      greetingTimeout: 30000,
-      socketTimeout: 30000,
+      connectionTimeout: 60000,
+      greetingTimeout: 60000,
+      socketTimeout: 60000,
     });
 
     await transporter.sendMail({
