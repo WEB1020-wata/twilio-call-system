@@ -17,6 +17,8 @@ const {
   MAIL_TO,
 } = process.env;
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 app.get("/", (req, res) => {
   res.send("server is running");
 });
@@ -60,6 +62,9 @@ app.post("/recording-finished", async (req, res) => {
     }
 
     const wavUrl = `${recordingUrl}.wav`;
+
+    // Twilio側で録音ファイル準備に少し時間がかかるため待つ
+    await sleep(5000);
 
     const audioResp = await axios.get(wavUrl, {
       responseType: "arraybuffer",
@@ -122,7 +127,11 @@ app.post("/recording-finished", async (req, res) => {
 
     console.log("メール送信完了");
   } catch (error) {
-    console.error("処理エラー:", error.response?.data || error.message);
+    if (Buffer.isBuffer(error.response?.data)) {
+      console.error("処理エラー:", error.response.data.toString("utf8"));
+    } else {
+      console.error("処理エラー:", error.response?.data || error.message);
+    }
   }
 });
 
